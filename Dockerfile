@@ -1,24 +1,28 @@
-# A simple microsercive in Go packaged into a container image.
+# Build the applicaion from source
+FROM golang:1.20 AS build-stage
 
-FROM golang:1.20
-
-# Create a work directory, form now on I can use relative paths
 WORKDIR /app
 
-# Copy the module files before downloading the dependencies
 COPY go.* ./
-
-# Download de dependencies 
 RUN go mod download
 
-# Copy the souce code into the umage
 COPY *.go ./
 
-# Run the command to compile the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o /docker-gs-ping
 
-#Documente what port the application is going to listen on by default
+# Run the tests in the container
+FROM build-stage AS run-test-stage
+RUN go test -v ./...
+
+# Deploy the application binary into a lean image
+FROM gcr.io/distroless/base-debian11 AS build-release-stage
+
+WORKDIR /
+
+COPY --from=build-stage /docker-gs-ping /docker-gs-ping
+
 EXPOSE 8080
 
-# Run 
-CMD ["/docker-gs-ping"]
+USER nonroot:nonroot
+
+ENTRYPOINT ["/docker-gs-ping"]
